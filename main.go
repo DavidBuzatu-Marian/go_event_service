@@ -26,4 +26,6 @@ func ReadConfig() {
 
 func main() {
 	ReadConfig()
+	// PrintEvents()
+	TestCalendar()
 }
