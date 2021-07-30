@@ -8,7 +8,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"time"
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -16,14 +15,20 @@ import (
 	"google.golang.org/api/option"
 )
 
+var tokenFile = "./config/token.json"
+
 func getClient(config *oauth2.Config) *http.Client {
-	tokenFile := "./config/token.json"
-	token, err := tokenFromFile(tokenFile)
+	token := getTokenAndSaveIfNotFoundLocally(config)
+	return config.Client(context.Background(), token)
+}
+
+func getTokenAndSaveIfNotFoundLocally(config *oauth2.Config) *oauth2.Token {
+	token, err := getTokenFromFile(tokenFile)
 	if err != nil {
 		token = getTokenFromWeb(config)
 		saveToken(tokenFile, token)
 	}
-	return config.Client(context.Background(), token)
+	return token
 }
 
 func getTokenFromWeb(config *oauth2.Config) *oauth2.Token {
@@ -41,7 +46,7 @@ func getTokenFromWeb(config *oauth2.Config) *oauth2.Token {
 	return token
 }
 
-func tokenFromFile(file string) (*oauth2.Token, error) {
+func getTokenFromFile(file string) (*oauth2.Token, error) {
 	file_stream, err := os.Open(file)
 	if err != nil {
 		return nil, err
@@ -64,39 +69,57 @@ func saveToken(path string, token *oauth2.Token) {
 
 func TestCalendar() {
 	ctx := context.Background()
-	b, err := ioutil.ReadFile("./config/credentials.json")
-	if err != nil {
-		log.Fatalf("Unable to read client secret file: %v", err)
-	}
-
-	// If modifying these scopes, delete your previously saved token.json.
-	config, err := google.ConfigFromJSON(b, calendar.CalendarReadonlyScope)
-	if err != nil {
-		log.Fatalf("Unable to parse client secret file to config: %v", err)
-	}
+	jsonKey := getJsonKeyFromConfigFile()
+	config := getConfigFromJSON(jsonKey)
 	client := getClient(config)
 
-	srv, err := calendar.NewService(ctx, option.WithHTTPClient(client))
+	calendarService := createCalendarService(client, ctx)
+	addDummyEvent(calendarService)
+}
+
+func addDummyEvent(calendarService *calendar.Service) {
+	event := createEvent("Some title", "2021-07-31T09:00:00-07:00", "2021-07-31T10:00:00-07:00")
+	calendarId := "primary"
+	event, err := calendarService.Events.Insert(calendarId, event).Do()
+	if err != nil {
+		log.Fatalf("Unable to create event. %v\n", err)
+	}
+	fmt.Printf("Event created: %s\n", event.HtmlLink)
+}
+
+func createEvent(title string, startDate string, endDate string) *calendar.Event {
+	return &calendar.Event{
+		Summary: title,
+		Start: &calendar.EventDateTime{
+			DateTime: startDate,
+		},
+		End: &calendar.EventDateTime{
+			DateTime: endDate,
+		},
+	}
+}
+
+func createCalendarService(client *http.Client, ctx context.Context) *calendar.Service {
+	service, err := calendar.NewService(ctx, option.WithHTTPClient(client))
 	if err != nil {
 		log.Fatalf("Unable to retrieve Calendar client: %v", err)
 	}
+	return service
+}
 
-	t := time.Now().Format(time.RFC3339)
-	events, err := srv.Events.List("primary").ShowDeleted(false).
-		SingleEvents(true).TimeMin(t).MaxResults(10).OrderBy("startTime").Do()
+func getConfigFromJSON(jsonKey []byte) *oauth2.Config {
+	// If modifying these scopes, delete previously saved token.json.
+	config, err := google.ConfigFromJSON(jsonKey, calendar.CalendarScope)
 	if err != nil {
-		log.Fatalf("Unable to retrieve next ten of the user's events: %v", err)
+		log.Fatalf("Unable to parse client secret file to config: %v", err)
 	}
-	fmt.Println("Upcoming events:")
-	if len(events.Items) == 0 {
-		fmt.Println("No upcoming events found.")
-	} else {
-		for _, item := range events.Items {
-			date := item.Start.DateTime
-			if date == "" {
-				date = item.Start.Date
-			}
-			fmt.Printf("%v (%v)\n", item.Summary, date)
-		}
+	return config
+}
+
+func getJsonKeyFromConfigFile() []byte {
+	jsonKey, err := ioutil.ReadFile("./config/credentials.json")
+	if err != nil {
+		log.Fatalf("Unable to read client secret file: %v", err)
 	}
+	return jsonKey
 }
