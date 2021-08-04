@@ -80,20 +80,21 @@ func AddEvents(events *Event) {
 
 func addEvents(calendarService *calendar.Service, events *Event) {
 	calendarEvents := createEvents(events)
-	err := addEventsToCalendar(calendarService, calendarEvents)
+	err := addEventsToCalendar(calendarService, calendarEvents, events)
 	if err != nil {
 		log.Fatalf("Unable to create events. %v\n", err)
 	}
 }
 
-func addEventsToCalendar(calendarService *calendar.Service, events []*calendar.Event) error {
+func addEventsToCalendar(calendarService *calendar.Service, calendarEvents []*calendar.Event, events *Event) error {
 	calendarId := "primary"
-	for _, event := range events {
+	for idx, event := range calendarEvents {
 		resultEvent, err := calendarService.Events.Insert(calendarId, event).Do()
 		if err != nil {
 			return err
 		}
-		fmt.Printf("Event created: %s. Id: %s\n", resultEvent.HtmlLink, resultEvent.Id)
+		UpdateEvent("http://localhost:8080/api/event/"+(*events)[idx].ID, resultEvent)
+		// fmt.Printf("Event created: %s. Id: %s\n", resultEvent.HtmlLink, resultEvent.Id)
 	}
 	return nil
 }

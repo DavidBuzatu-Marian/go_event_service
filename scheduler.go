@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -25,7 +24,7 @@ var httpClient = &http.Client{Timeout: 10 * time.Second}
 func Schedule(repeatInterval time.Duration) {
 	for {
 		events := new(Event)
-		err := getPastHourEvents("http://localhost:8080/api/event/info/latest", events)
+		err := GetPastHourEvents("http://localhost:8080/api/event/info/latest", events)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -36,14 +35,4 @@ func Schedule(repeatInterval time.Duration) {
 		<-time.After(repeatInterval * time.Second)
 	}
 
-}
-
-func getPastHourEvents(url string, target interface{}) error {
-	response, err := httpClient.Get(url)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer response.Body.Close()
-
-	return json.NewDecoder(response.Body).Decode(&target)
 }
