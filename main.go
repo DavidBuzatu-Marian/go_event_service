@@ -1,6 +1,5 @@
 package main
 
 func main() {
-	PrintEvents()
-	// TestCalendar()
+	Schedule(100)
 }

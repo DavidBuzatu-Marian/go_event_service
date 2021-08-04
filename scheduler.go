@@ -17,19 +17,25 @@ type Event []struct {
 	Directions string    `json:"directions"`
 	Details    string    `json:"details"`
 	DateAdded  time.Time `json:"date_added"`
+	CalendarID string    `json:"calendar_id"`
 }
 
 var httpClient = &http.Client{Timeout: 10 * time.Second}
 
-func PrintEvents() {
-	events := new(Event)
-	err := getPastHourEvents("http://localhost:8080/api/event/info/latest", events)
-	if err != nil {
-		log.Fatal(err)
+func Schedule(repeatInterval time.Duration) {
+	for {
+		events := new(Event)
+		err := getPastHourEvents("http://localhost:8080/api/event/info/latest", events)
+		if err != nil {
+			log.Fatal(err)
+		}
+		for _, val := range *events {
+			fmt.Println(val)
+		}
+		AddEvents(events)
+		<-time.After(repeatInterval * time.Second)
 	}
-	for _, val := range *events {
-		fmt.Println(val)
-	}
+
 }
 
 func getPastHourEvents(url string, target interface{}) error {

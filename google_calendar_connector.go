@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -67,24 +68,45 @@ func saveToken(path string, token *oauth2.Token) {
 	json.NewEncoder(file_stream).Encode(token)
 }
 
-func TestCalendar() {
+func AddEvents(events *Event) {
 	ctx := context.Background()
 	jsonKey := getJsonKeyFromConfigFile()
 	config := getConfigFromJSON(jsonKey)
 	client := getClient(config)
 
 	calendarService := createCalendarService(client, ctx)
-	addDummyEvent(calendarService)
+	addEvents(calendarService, events)
 }
 
-func addDummyEvent(calendarService *calendar.Service) {
-	event := createEvent("Some title", "2021-07-31T09:00:00-07:00", "2021-07-31T10:00:00-07:00")
-	calendarId := "primary"
-	event, err := calendarService.Events.Insert(calendarId, event).Do()
+func addEvents(calendarService *calendar.Service, events *Event) {
+	calendarEvents := createEvents(events)
+	err := addEventsToCalendar(calendarService, calendarEvents)
 	if err != nil {
-		log.Fatalf("Unable to create event. %v\n", err)
+		log.Fatalf("Unable to create events. %v\n", err)
 	}
-	fmt.Printf("Event created: %s\n", event.HtmlLink)
+}
+
+func addEventsToCalendar(calendarService *calendar.Service, events []*calendar.Event) error {
+	calendarId := "primary"
+	for _, event := range events {
+		resultEvent, err := calendarService.Events.Insert(calendarId, event).Do()
+		if err != nil {
+			return err
+		}
+		fmt.Printf("Event created: %s. Id: %s\n", resultEvent.HtmlLink, resultEvent.Id)
+	}
+	return nil
+}
+
+func createEvents(events *Event) []*calendar.Event {
+	calendarEvents := []*calendar.Event{}
+	for _, event := range *events {
+		if event.CalendarID == "" {
+			calendarEvent := createEvent(event.Name, event.StartDate.Format(time.RFC3339), event.EndDate.Format(time.RFC3339))
+			calendarEvents = append(calendarEvents, calendarEvent)
+		}
+	}
+	return calendarEvents
 }
 
 func createEvent(title string, startDate string, endDate string) *calendar.Event {
